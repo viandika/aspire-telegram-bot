@@ -100,7 +100,7 @@ def facts_to_str(user_data: Dict[str, str]) -> str:
     facts = []
     for key, value in user_data.items():
         if key in ("Outflow", "Inflow") and value != "":
-            facts.append(f"*{key}* - Rp {int(value):,}")
+            facts.append(f"*{key}* - " + config["currency"] + f" {int(value):,}")
         else:
             facts.append(f"*{key}* - {value}")
     return "\n".join(facts).join(["\n", "\n"])

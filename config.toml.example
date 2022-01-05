@@ -1,3 +1,5 @@
+currency = "$"
+
 [gsheet]
 gsheet_api_key_filepath = ""
 gsheet_worksheet_id = ""
