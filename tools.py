@@ -5,16 +5,25 @@ from itertools import groupby
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 
 
-def get_all_categories(spreadsheet):
+def get_all_categories(spreadsheet) -> dict[str, list]:
     worksheet = spreadsheet.worksheet("Configuration")
     values = worksheet.get("r_ConfigurationData")
 
-    groups = [i[1] for i in values if i[0] == "✦"]
-    categories = [list(g) for k, g in groupby(values, key=lambda x: x[0] != "✦") if k]
+    # Find groups and exclude credit card payments
+    groups = [i[1] for i in values if i[0] == "✦" and 'Credit Card' not in i[1]]
 
+    # get categories from configuration worksheet
+    categories = []
+    for k, g in groupby(values, key=lambda x: x[0] != "✦" and x[0] != "◘"):
+        if k:
+            categories.append(list(g))
     categories_titles = [[k[1] for k in i] for i in categories]
 
     grouped_cats = dict(zip(groups, categories_titles))
+    # Add missing options
+    category = worksheet.get("TransactionCategories")
+    grouped_cats["Others"] = list(
+        set([i for j in category for i in j]) ^ set([i for j in categories_titles for i in j]))
 
     return grouped_cats
 
