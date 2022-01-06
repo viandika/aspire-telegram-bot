@@ -10,7 +10,7 @@ def get_all_categories(spreadsheet) -> dict[str, list]:
     values = worksheet.get("r_ConfigurationData")
 
     # Find groups and exclude credit card payments
-    groups = [i[1] for i in values if i[0] == "✦" and 'Credit Card' not in i[1]]
+    groups = [i[1] for i in values if i[0] == "✦" and "Credit Card" not in i[1]]
 
     # get categories from configuration worksheet
     categories = []
@@ -23,7 +23,9 @@ def get_all_categories(spreadsheet) -> dict[str, list]:
     # Add missing options
     category = worksheet.get("TransactionCategories")
     grouped_cats["Others"] = list(
-        set([i for j in category for i in j]) ^ set([i for j in categories_titles for i in j]))
+        set([i for j in category for i in j])
+        ^ set([i for j in categories_titles for i in j])
+    )
 
     return grouped_cats
 
@@ -45,7 +47,7 @@ def separate_callback_data(data):
     return data.split(";")
 
 
-def create_callback_data(action, year, month, day):
+def create_calendar_callback_data(action, year, month, day):
     """Create the callback data associated to each button"""
     return "CALENDAR" + ";" + ";".join([action, str(year), str(month), str(day)])
 
@@ -53,24 +55,20 @@ def create_callback_data(action, year, month, day):
 def create_calendar(year=None, month=None):
     """
     Create an inline keyboard with the provided year and month
-    :param int year: Year to use in the calendar, if None the current year is used.
-    :param int month: Month to use in the calendar, if None the current month is used.
-    :return: Returns the InlineKeyboardMarkup object with the calendar.
     """
     now = datetime.datetime.now()
-    if year == None:
+    if year is None:
         year = now.year
-    if month == None:
+    if month is None:
         month = now.month
-    data_ignore = create_callback_data("IGNORE", year, month, 0)
+    data_ignore = create_calendar_callback_data("IGNORE", year, month, 0)
     keyboard = []
     # First row - Month and Year
-    row = []
-    row.append(
+    row = [
         InlineKeyboardButton(
             calendar.month_name[month] + " " + str(year), callback_data=data_ignore
         )
-    )
+    ]
     keyboard.append(row)
     # Second row - Week Days
     row = []
@@ -88,23 +86,24 @@ def create_calendar(year=None, month=None):
                 row.append(
                     InlineKeyboardButton(
                         str(day),
-                        callback_data=create_callback_data("DAY", year, month, day),
+                        callback_data=create_calendar_callback_data(
+                            "DAY", year, month, day
+                        ),
                     )
                 )
         keyboard.append(row)
     # Last row - Buttons
-    row = []
-    row.append(
+    row = [
         InlineKeyboardButton(
-            "<", callback_data=create_callback_data("PREV-MONTH", year, month, day)
-        )
-    )
-    row.append(InlineKeyboardButton(" ", callback_data=data_ignore))
-    row.append(
+            "<",
+            callback_data=create_calendar_callback_data("PREV-MONTH", year, month, day),
+        ),
+        InlineKeyboardButton(" ", callback_data=data_ignore),
         InlineKeyboardButton(
-            ">", callback_data=create_callback_data("NEXT-MONTH", year, month, day)
-        )
-    )
+            ">",
+            callback_data=create_calendar_callback_data("NEXT-MONTH", year, month, day),
+        ),
+    ]
     keyboard.append(row)
 
     return InlineKeyboardMarkup(keyboard)
@@ -114,10 +113,6 @@ def process_calendar_selection(update, context):
     """
     Process the callback_query. This method generates a new calendar if forward or
     backward is pressed. This method should be called inside a CallbackQueryHandler.
-    :param telegram.Bot bot: The bot, as provided by the CallbackQueryHandler
-    :param telegram.Update update: The update, as provided by the CallbackQueryHandler
-    :return: Returns a tuple (Boolean,datetime.datetime), indicating if a date is selected
-                and returning the date if so.
     """
     ret_data = (False, None)
     query = update.callback_query
@@ -155,3 +150,51 @@ def process_calendar_selection(update, context):
         )
         # UNKNOWN
     return ret_data
+
+
+def create_category_callback_data(action, selection):
+    return action + ";" + selection
+
+
+def create_category_inline(options, action):
+    cats_keyboard = [list(options)[i : i + 2] for i in range(0, len(list(options)), 2)]
+    for i, x in enumerate(cats_keyboard):
+        for j, k in enumerate(x):
+            cats_keyboard[i][j] = InlineKeyboardButton(
+                k, callback_data=create_category_callback_data(action, str(k))
+            )
+    if action == "cat_selection":
+        cats_keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "< Back", callback_data=create_category_callback_data("back", "")
+                )
+            ]
+        )
+    return InlineKeyboardMarkup(cats_keyboard)
+
+
+def handle_category_inline(update, context, categories):
+    return_data = (False, None)
+    query = update.callback_query
+    action, choice = separate_callback_data(query.data)
+
+    if action == "group_sel":
+        context.bot.edit_message_text(
+            text="Pick Category",
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=create_category_inline(
+                categories[str(choice)], "cat_selection"
+            ),
+        )
+    elif action == "back":
+        context.bot.edit_message_text(
+            text="Pick Group",
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=create_category_inline(categories.keys(), "group_sel"),
+        )
+    elif action == "cat_selection":
+        return_data = (True, choice)
+    return return_data

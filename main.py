@@ -26,9 +26,12 @@ from telegram.ext import (
 
 from tools import (
     create_calendar,
+    create_category_inline,
     get_accounts,
     get_all_categories,
+    handle_category_inline,
     process_calendar_selection,
+    separate_callback_data,
     write_trx,
 )
 
@@ -134,18 +137,11 @@ def start(update: Update, context: CallbackContext) -> int:
 @restricted
 def category_start(update, context):
     """Separate function for category selection to filter the options with inline keyboard."""
-    cats_keyboard = [
-        list(trx_categories.keys())[i : i + 2]
-        for i in range(0, len(list(trx_categories.keys())), 2)
-    ]
-    for i, x in enumerate(cats_keyboard):
-        for j, k in enumerate(x):
-            cats_keyboard[i][j] = InlineKeyboardButton(k, callback_data=str(k))
-
-    reply_markup = InlineKeyboardMarkup(cats_keyboard)
-    update.message.reply_text("Choose a Group", reply_markup=reply_markup)
-
-    return CHOOSE_TRX_CATEGORY
+    update.message.reply_text(
+        "Choose a Group",
+        reply_markup=create_category_inline(trx_categories.keys(), "group_sel"),
+    )
+    return CATEGORY_REPLY_CHOOSE_TRX_OPTS
 
 
 @restricted
@@ -153,20 +149,12 @@ def category_lists(update, context):
     """Update inline keyboard with selected category groups"""
     query = update.callback_query
     query.answer()
+    _, choice = separate_callback_data(query.data)
 
-    choice = query.data
-    options = [
-        trx_categories[str(choice)][i : i + 2]
-        for i in range(0, len(list(trx_categories[str(choice)])), 2)
-    ]
-
-    for i, x in enumerate(options):
-        for j, k in enumerate(x):
-            options[i][j] = InlineKeyboardButton(k, callback_data=str(k))
-    reply_markup = InlineKeyboardMarkup(options)
-
-    query.edit_message_text(text="which category", reply_markup=reply_markup)
-
+    query.edit_message_text(
+        text="which category",
+        reply_markup=create_category_inline(trx_categories[str(choice)], "category"),
+    )
     return CATEGORY_REPLY_CHOOSE_TRX_OPTS
 
 
@@ -177,16 +165,18 @@ def category_end(update, context):
 
     query = update.callback_query
     query.answer()
-    choice = query.data
 
-    user_data["Category"] = choice
-    query.message.reply_text(
-        "So far:" f"{facts_to_str(user_data)} Add More or done",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=markup,
-    )
+    selected, choice = handle_category_inline(update, context, trx_categories)
+    if selected:
+        user_data["Category"] = choice
+        query.message.reply_text(
+            "So far:" f"{facts_to_str(user_data)} Add More or done",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=markup,
+        )
 
-    return CHOOSE_TRX_OPTS
+        return CHOOSE_TRX_OPTS
+    return CATEGORY_REPLY_CHOOSE_TRX_OPTS
 
 
 @restricted
