@@ -76,7 +76,7 @@ reply_keyboard = [
     ["Outflow", "Inflow"],
     ["Category", "Account"],
     ["Memo", "Date"],
-    ["Done"],
+    ["Cancel", "Done"],
 ]
 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
@@ -305,6 +305,17 @@ def done(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+def cancel_trx(update, context):
+    user_data = context.user_data
+    if "choice" in user_data:
+        del user_data["choice"]
+    update.message.reply_text(
+        f"Adding transaction has been cancelled.\n /start to start again.",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+
 def main() -> None:
     """Run the bot."""
     updater = Updater(config["telegram"]["telegram_token"])
@@ -350,7 +361,10 @@ def main() -> None:
             DATE_REPLY: [CallbackQueryHandler(date_handler)],
             DATE_END: [MessageHandler(Filters.text, date_end)],
         },
-        fallbacks=[MessageHandler(Filters.regex("^Done$"), done)],
+        fallbacks=[
+            MessageHandler(Filters.regex("^Done$"), done),
+            MessageHandler(Filters.regex("^Cancel$"), cancel_trx),
+        ],
     )
 
     dispatcher.add_handler(conv_handler)
